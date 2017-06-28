@@ -5,8 +5,15 @@ import numpy as np
 import os
 import time
 import datetime
-import data_helpers
-from text_cnn import TextCNN
+
+# # for stand-alone
+# import data_helpers
+# from text_cnn import TextCNN
+
+# for apis
+from cnn import data_helpers
+from cnn.text_cnn import TextCNN
+
 from tensorflow.contrib import learn
 import csv
 import nltk
@@ -56,9 +63,19 @@ def getMsgAndPredict():
 
     getPredictions(x_test)
 
+def getMsgAndPredictApi(msg):
+    x_raw = []
+    x_raw.append(msg)
 
+    x_raw = np.array(x_raw)
+    #print(x_raw)
+    #Map data into vocabulary
+    vocab_path = os.path.join(FLAGS.checkpoint_dir, "..", "vocab")
+    vocab_processor = learn.preprocessing.VocabularyProcessor.restore(vocab_path)
+    x_test = np.array(list(vocab_processor.fit_transform(x_raw)))
 
-print("\nEvaluating...\n")
+    return getPredictions(x_test)
+
 
 # Evaluation
 # ==================================================
@@ -97,4 +114,5 @@ def getPredictions(x_test):
 
             return all_predictions
 
-getMsgAndPredict()
+## for stand-alone
+#getMsgAndPredict()
