@@ -9,18 +9,20 @@ import data_helpers
 from text_cnn import TextCNN
 from tensorflow.contrib import learn
 import csv
+import nltk
+import sys
 
 # Parameters
 # ==================================================
 
 # Data Parameters
-tf.flags.DEFINE_string("positive_data_file", "./data/rt-polaritydata/rt-polarity.pos", "Data source for the positive data.")
-tf.flags.DEFINE_string("negative_data_file", "./data/rt-polaritydata/rt-polarity.neg", "Data source for the positive data.")
+tf.flags.DEFINE_string("train_file", "../../data/2017-06-08/dataReplicated.csv", "Data source for the train data.")
+tf.flags.DEFINE_string("test_file", "../../data/2017-06-07/dataReplicated.csv", "Data source for the test data.")
 
 # Eval Parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_string("checkpoint_dir", "", "Checkpoint directory from training run")
-tf.flags.DEFINE_boolean("eval_train", False, "Evaluate on all training data")
+tf.flags.DEFINE_string("checkpoint_dir", "./runs/1498556243/checkpoints/", "Checkpoint directory from training run")
+tf.flags.DEFINE_boolean("eval_train", True, "Evaluate on all training data")
 
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
@@ -34,10 +36,17 @@ for attr, value in sorted(FLAGS.__flags.items()):
     print("{}={}".format(attr.upper(), value))
 print("")
 
+def myTokenize (iter):
+    for value in iter:
+        yield nltk.word_tokenize(value)
+
 # CHANGE THIS: Load data. Load your own data here
 if FLAGS.eval_train:
-    x_raw, y_test = data_helpers.load_data_and_labels(FLAGS.positive_data_file, FLAGS.negative_data_file)
+    x_raw, y_test = data_helpers.loadData(FLAGS.test_file)
     y_test = np.argmax(y_test, axis=1)
+    badCount = sum(y_test == 1)
+    totalCount = len(y_test)
+    print("bad: {0}, total: {1}, ratio: {2}".format(badCount, totalCount, badCount/totalCount))
 else:
     x_raw = ["a masterpiece four years in the making", "everything is off."]
     y_test = [1, 0]
@@ -45,7 +54,8 @@ else:
 # Map data into vocabulary
 vocab_path = os.path.join(FLAGS.checkpoint_dir, "..", "vocab")
 vocab_processor = learn.preprocessing.VocabularyProcessor.restore(vocab_path)
-x_test = np.array(list(vocab_processor.transform(x_raw)))
+x_test = np.array(list(vocab_processor.fit_transform(x_raw)))
+
 
 print("\nEvaluating...\n")
 
@@ -76,10 +86,11 @@ with graph.as_default():
 
         # Collect the predictions here
         all_predictions = []
-
+        print("Getting predictions...")
         for x_test_batch in batches:
             batch_predictions = sess.run(predictions, {input_x: x_test_batch, dropout_keep_prob: 1.0})
             all_predictions = np.concatenate([all_predictions, batch_predictions])
+        print("got Predictions...")
 
 # Print accuracy if y_test is defined
 if y_test is not None:
@@ -88,7 +99,7 @@ if y_test is not None:
     print("Accuracy: {:g}".format(correct_predictions/float(len(y_test))))
 
 # Save the evaluation to a csv
-predictions_human_readable = np.column_stack((np.array(x_raw), all_predictions))
+predictions_human_readable = np.column_stack((np.array(x_raw), all_predictions, y_test))
 out_path = os.path.join(FLAGS.checkpoint_dir, "..", "prediction.csv")
 print("Saving evaluation to {0}".format(out_path))
 with open(out_path, 'w') as f:

@@ -2,6 +2,8 @@ import numpy as np
 import re
 import itertools
 from collections import Counter
+import pandas as pd
+import numpy as np
 
 
 def clean_str(string):
@@ -44,6 +46,29 @@ def load_data_and_labels(positive_data_file, negative_data_file):
     y = np.concatenate([positive_labels, negative_labels], 0)
     return [x_text, y]
 
+def loadData(file):
+    tpg_data = pd.read_csv(file, sep='|')
+    print(tpg_data.dtypes)
+
+    x_text = np.array(tpg_data.text, dtype = pd.Series)
+
+    y_text = np.array(tpg_data.label , dtype = pd.Series)
+    y_text_onehot = []
+    countBad = 0
+    totalCount = 0
+    for i, j in enumerate(y_text):
+        totalCount = totalCount + 1
+        # if j == 1:
+        #     y_text_onehot.append([0,1])
+        #     countBad = countBad + 1
+        #print(str(x_text[i:i+1][0]))
+        if isBad(str(x_text[i:i+1][0])):
+            y_text_onehot.append([0,1])
+            countBad = countBad + 1
+        else:
+            y_text_onehot.append([1,0])
+    print("bad: {0}, total: {1}, ratio: {2}".format(countBad, totalCount, countBad/totalCount))
+    return (x_text, np.array(y_text_onehot))
 
 def batch_iter(data, batch_size, num_epochs, shuffle=True):
     """
@@ -63,3 +88,29 @@ def batch_iter(data, batch_size, num_epochs, shuffle=True):
             start_index = batch_num * batch_size
             end_index = min((batch_num + 1) * batch_size, data_size)
             yield shuffled_data[start_index:end_index]
+
+def loadBad(filepath):
+    badWords = set()
+    with open(filepath, 'r') as fb:
+        for line in fb:
+            word = line.strip()
+            if len(word) > 1:
+                badWords.add(word)
+    return badWords
+
+def checkIfBad(msg, badWords):
+    isbad = False
+    for word in badWords:
+        if word in str(msg):
+            isbad = True
+            break
+    return isbad
+
+def isBad(msg):
+    badWords = loadBad("../../data/abusive_content/bad_words.txt")
+    return checkIfBad(msg.lower(), badWords)
+
+'''
+"Hey motherfucker. I fuck ur mom. And I fuck ur sister too. Sisterfuckers. O machikna randiko chora. Khelchas ain't. Oea randiko chora kt lai j sukai vanchas Teri. Tero ama lai mailay dui khep chekako. Tero AMA Ko kalo puti chiya. Randiko chora valu tero didi. Sabailay chikako. Hamilay tero didi lai 12 jana lay chikako. Randiko chora mero kalo lado chha. Khelchas muji tero thau van muji tero gau ma kutchu ta randiko chora l. Ta randi Ko ban tero AMA Ko haneko. Tero AMA Ko chikako. Ter. Tero didi Ko ra sano baini Ko puti ma falam chirako. Randiko chora. Oea tero address van randiko chora darauchas. Daraysis. Muji tero AMA lai kati chiknu. Boksi Ko chora. Khelchas vani tero exect address van. Katikay baun muji darauxas randiko ban. Taro AMA randi valu. Boksi Ko ban darauxas bahun muji. Address van talai ra tero bau lai kutchu. Daraixa bahun muji bau chora lai kutarY. AMA ra baini lai chikchu. Fuck ur mom saroj muji. Suck my dick bitches. Motherfucker. Darako puri. Randi Ko baan. Valu Ko chora. Buini chikuwa. Didi lai besyA laya send gar. Daraixas bahun randiko chora. Randikoban address send gar vaneko. Muji tero santan lai siduxu"
+
+'''
