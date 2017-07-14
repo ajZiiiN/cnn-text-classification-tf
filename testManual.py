@@ -71,6 +71,7 @@ def getMsgAndPredictApi(msg):
     #print(x_raw)
     #Map data into vocabulary
     vocab_path = os.path.join(FLAGS.checkpoint_dir, "..", "vocab")
+
     vocab_processor = learn.preprocessing.VocabularyProcessor.restore(vocab_path)
     x_test = np.array(list(vocab_processor.fit_transform(x_raw)))
 

@@ -10,6 +10,8 @@ from text_cnn import TextCNN
 from tensorflow.contrib import learn
 import nltk
 
+from tensorflow.contrib.session_bundle import exporter
+
 # Parameters
 # ==================================================
 
@@ -134,6 +136,48 @@ with tf.Graph().as_default():
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         saver = tf.train.Saver(tf.global_variables(), max_to_keep=FLAGS.num_checkpoints)
+        # zi: need to create a SavedModelBuilder here
+
+        # zi: Build the signature_def_map
+        '''
+        model_exporter = exporter.Exporter(saver)
+        model_exporter.init(
+            sess.graph.as_graph_def(),
+            init_op=init_op,
+            default_graph_signature=exporter.classification_signature(
+            input_tensor=serialized_tf_example,
+            classes_tensor=prediction_classes,
+            scores_tensor=values),
+        named_graph_signatures={
+            'inputs': exporter.generic_signature({'images': x}),
+            'outputs': exporter.generic_signature({'scores': y})})
+        model_exporter.export(export_path, tf.constant(FLAGS.export_version), sess)
+        '''
+        ##### Start: exporting model #####
+        model_exporter = exporter.Exporter(saver)
+
+        # maybe this needs to be done before saver is created
+        init_op = tf.group(tf.tables_initializer(), name='init_op')
+        serving_input_x = cnn.input_x
+        values, indices = tf.nn.top_k(cnn.input_y, 2)
+        table = tf.contrib.lookup.index_to_string_table_from_tensor(
+            tf.constant([str(i) for i in range(2)]))
+        prediction_classes = table.lookup(tf.to_int64(indices))
+
+        model_exporter.init(
+            sess.graph.as_graph_def(),
+            init_op=init_op,
+            default_graph_signature=exporter.classification_signature(
+                input_tensor=serving_input_x,
+                classes_tensor=prediction_classes,
+                scores_tensor=values),
+            named_graph_signatures={
+                'inputs': exporter.generic_signature({'images': cnn.input_x}),
+                'outputs': exporter.generic_signature({'scores': cnn.input_y})})
+        export_path = "<keep the path here>"
+        model_exporter.export(export_path, tf.constant(FLAGS.export_version), sess)
+
+        ## END ##
 
         # Write vocabulary
         vocab_processor.save(os.path.join(out_dir, "vocab"))
