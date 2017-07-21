@@ -36,6 +36,7 @@ tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (d
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
+tf.flags.DEFINE_integer("model_version", 1, "Serving version")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -61,7 +62,9 @@ def main(_):
     #max_document_length = min([len(x.split(" ")) for x in x_text])
     max_document_length = 200
     print("max_document_length ", max_document_length)
-    vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn = myTokenize)
+    vocab_path = os.path.join("./runs/1498556243/checkpoints/", "..", "vocab")
+    vocab_processor = learn.preprocessing.VocabularyProcessor.restore(vocab_path)
+    #vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length, tokenizer_fn = myTokenize)
     x = np.array(list(vocab_processor.fit_transform(x_text)))
 
     # Randomly shuffle data
@@ -155,30 +158,76 @@ def main(_):
                 'outputs': exporter.generic_signature({'scores': y})})
             model_exporter.export(export_path, tf.constant(FLAGS.export_version), sess)
             '''
-            ##### Start: exporting model #####
-            model_exporter = exporter.Exporter(saver)
+            # ##### Start: exporting model #####
+            # model_exporter = exporter.Exporter(saver)
+            #
+            # # maybe this needs to be done before saver is created
+            # init_op = tf.group(tf.tables_initializer(), name='init_op')
+            # serving_input_x = cnn.input_x
+            # values, indices = tf.nn.top_k(cnn.input_y, 2)
+            # table = tf.contrib.lookup.index_to_string_table_from_tensor(
+            #     tf.constant([str(i) for i in range(2)]))
+            # prediction_classes = table.lookup(tf.to_int64(indices))
+            #
+            # model_exporter.init(
+            #     sess.graph.as_graph_def(),
+            #     init_op=init_op,
+            #     default_graph_signature=exporter.classification_signature(
+            #         input_tensor=serving_input_x,
+            #         classes_tensor=prediction_classes,
+            #         scores_tensor=values),
+            #     named_graph_signatures={
+            #         'inputs': exporter.generic_signature({'images': cnn.input_x}),
+            #         'outputs': exporter.generic_signature({'scores': cnn.input_y})})
+            # export_path = "/home/zi/sandbox/honest-ranger/data/save/serving"
+            # model_exporter.export(export_path, tf.constant(FLAGS.export_version), sess)
+            #
+            # ## END ##
 
-            # maybe this needs to be done before saver is created
-            init_op = tf.group(tf.tables_initializer(), name='init_op')
-            serving_input_x = cnn.input_x
+            ## using save-model ##
+            export_path = "/home/zi/sandbox/honest-ranger/data/save/serving/model"
+            builder = tf.saved_model.builder.SavedModelBuilder(export_path)
+            serving_input_x = tf.saved_model.utils.build_tensor_info(cnn.input_x)
             values, indices = tf.nn.top_k(cnn.input_y, 2)
             table = tf.contrib.lookup.index_to_string_table_from_tensor(
                 tf.constant([str(i) for i in range(2)]))
-            prediction_classes = table.lookup(tf.to_int64(indices))
+            prediction_classes = tf.saved_model.utils.build_tensor_info(table.lookup(tf.to_int64(indices)))
+            print("Zi: Created signature Classes ...")
+            classification_signature = (
+                tf.saved_model.signature_def_utils.build_signature_def(
+                    inputs={
+                        tf.saved_model.signature_constants.CLASSIFY_INPUTS:
+                            serving_input_x
+                    },
+                    outputs={
+                        tf.saved_model.signature_constants.CLASSIFY_OUTPUT_CLASSES:
+                            prediction_classes,
+                        tf.saved_model.signature_constants.CLASSIFY_OUTPUT_SCORES:
+                            prediction_classes
+                    },
+                    method_name=tf.saved_model.signature_constants.
+                        CLASSIFY_METHOD_NAME))
 
-            model_exporter.init(
-                sess.graph.as_graph_def(),
-                init_op=init_op,
-                default_graph_signature=exporter.classification_signature(
-                    input_tensor=serving_input_x,
-                    classes_tensor=prediction_classes,
-                    scores_tensor=values),
-                named_graph_signatures={
-                    'inputs': exporter.generic_signature({'images': cnn.input_x}),
-                    'outputs': exporter.generic_signature({'scores': cnn.input_y})})
-            export_path = "/honest-ranger/save"
-            model_exporter.export(export_path, tf.constant(FLAGS.export_version), sess)
-
+            prediction_signature = (
+                tf.saved_model.signature_def_utils.build_signature_def(
+                    inputs={'images': serving_input_x},
+                    outputs={'scores': prediction_classes},
+                )
+            )
+            print("Zi: Signatures created ...")
+            #legacy_init_op = tf.group(tf.tables_initializer(), name='legacy_init_op')
+            init_op = tf.group(tf.tables_initializer(), name='init_op')
+            builder.add_meta_graph_and_variables(
+                sess, [tf.saved_model.tag_constants.SERVING],
+                signature_def_map={
+                    'predict_images': prediction_signature,
+                    tf.saved_model.signature_constants.
+                        DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                        classification_signature,
+                })
+            builder.save()
+            print("Successfully exported CNN model version '{}' into '{}'".format(
+                FLAGS.model_version, export_path))
             ## END ##
 
             # Write vocabulary

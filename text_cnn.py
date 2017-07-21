@@ -59,7 +59,7 @@ class TextCNN(object):
 
         # Add dropout
         with tf.name_scope("dropout"):
-            self.h_drop = tf.nn.dropout(self.h_pool_flat, self.dropout_keep_prob)
+            self.h_drop = tf.nn.dropout(self.h_pool_flat, 0.5)
 
         # Final (unnormalized) scores and predictions
         with tf.name_scope("output"):

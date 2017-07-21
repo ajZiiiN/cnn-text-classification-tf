@@ -6,13 +6,13 @@ import os
 import time
 import datetime
 
-# # for stand-alone
-# import data_helpers
-# from text_cnn import TextCNN
-
-# for apis
-from cnn import data_helpers
-from cnn.text_cnn import TextCNN
+# for stand-alone
+import data_helpers
+from text_cnn import TextCNN
+#
+# # for apis
+# from cnn import data_helpers
+# from cnn.text_cnn import TextCNN
 
 from tensorflow.contrib import learn
 import csv
@@ -116,4 +116,4 @@ def getPredictions(x_test):
             return all_predictions
 
 ## for stand-alone
-#getMsgAndPredict()
+# getMsgAndPredict()
