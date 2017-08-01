@@ -168,9 +168,9 @@ with tf.Graph().as_default():
             if current_step % FLAGS.checkpoint_every == 0:
                 path = saver.save(sess, checkpoint_prefix, global_step=current_step)
                 print("Saved model checkpoint to {}\n".format(path))
-            if current_step % FLAGS.checkpoint_every == 0:
+            if current_step // FLAGS.checkpoint_every == 30 and current_step % FLAGS.checkpoint_every == 0:
                 print("Trying to export new model...")
-                export_path = "/home/zi/sandbox/honest-ranger/data/save/serving/model/" + str(current_step // FLAGS.checkpoint_every)
+                export_path = "/home/zi/sandbox/honest-ranger/data/save/serving/model_gpu/" + str(1)
 
                 builder = tf.saved_model.builder.SavedModelBuilder(export_path)
 
@@ -207,8 +207,7 @@ with tf.Graph().as_default():
                         method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME))
 
                 # need to initialize ops only once, not in a loop
-                if current_step // FLAGS.checkpoint_every == 1:
-                    legacy_init_op = tf.group(tf.tables_initializer(), name='legacy_init_op')
+                legacy_init_op = tf.group(tf.tables_initializer(), name='legacy_init_op')
 
 
                 builder.add_meta_graph_and_variables(
