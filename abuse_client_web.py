@@ -40,7 +40,7 @@ from tensorflow.contrib import learn
 import sys
 import nltk
 import os
-sys.path.append("/home/zi/sandbox/tf_serving_example")
+sys.path.append("/Users/ajeetjha/sandbox/tf_serving_example")
 from tensorflow_serving.apis import predict_pb2
 from tensorflow_serving.apis import prediction_service_pb2
 from datetime import datetime as dt
@@ -59,12 +59,13 @@ def myTokenize (iter):
     for value in iter:
         yield nltk.word_tokenize(value)
 
+# vocab_path = os.path.join(FLAGS.checkpoint_dir, "..", "vocab")
+# vocab_processor = learn.preprocessing.VocabularyProcessor.restore(vocab_path)
 
 class _ResultCounter(object):
     """Counter for the prediction results."""
 
-    def __init__(self, num_tests, concurrency):
-        self._num_tests = num_tests
+    def __init__(self, concurrency):
         self._concurrency = concurrency
         self._error = 0
         self._done = 0
@@ -149,12 +150,11 @@ def _create_rpc_callback(label, result_counter, start_time):
     return _callback
 
 
-def do_inference(hostport, work_dir, concurrency, num_tests, vocab_processor):
+def do_inference(hostport, concurrency, test_str):
     """Tests PredictionService with concurrent requests.
 
     Args:
       hostport: Host:port address of the PredictionService.
-      work_dir: The full path of working directory for test data set.
       concurrency: Maximum number of concurrent requests.
       num_tests: Number of test images to use.
       vocab_processor : Vocabulary processor for chat inputs
@@ -164,45 +164,37 @@ def do_inference(hostport, work_dir, concurrency, num_tests, vocab_processor):
     Raises:
       IOError: An error occurred processing test data set.
     """
-    test_data_set = ['Madar.']
+    test_data_set = [test_str]
     test_data = numpy.array(list(vocab_processor.fit_transform(test_data_set)))
     host, port = hostport.split(':')
     channel = implementations.insecure_channel(host, int(port))
     stub = prediction_service_pb2.beta_create_PredictionService_stub(channel)
-    result_counter = _ResultCounter(num_tests, concurrency)
-    print("running for ", num_tests)
+    result_counter = _ResultCounter( concurrency)
     start_time = dt.now()
-    for _ in range(num_tests):
-        sleep(0.01)
-        request = predict_pb2.PredictRequest()
-        request.model_spec.name = 'abuse'
-        request.model_spec.signature_name = 'predict_text'
-        request.inputs['text'].CopyFrom(
-            tf.contrib.util.make_tensor_proto(test_data[0].astype(numpy.int32), shape=[1, test_data[0].size]))
-        result_counter.throttle()
-        print((dt.now() - start_time).microseconds//1000)
-        start_time = dt.now()
-        result_future = stub.Predict.future(request, 5.0)  # 5 seconds
-
-        result_future.add_done_callback(
-            _create_rpc_callback(0, result_counter, start_time))
-        #print("Adding callback....")
+    request = predict_pb2.PredictRequest()
+    request.model_spec.name = 'abuse'
+    request.model_spec.signature_name = 'predict_text'
+    # request.inputs['text'].CopyFrom(
+    #     tf.contrib.util.make_tensor_proto(test_data[0].astype(numpy.int32), shape=[1, test_data[0].size]))
+    result_counter.throttle()
+    print((dt.now() - start_time).microseconds//1000)
+    start_time = dt.now()
+    # result_future = stub.Predict.future(request, 5.0)  # 5 seconds
+    #
+    # result_future.add_done_callback(
+    #     _create_rpc_callback(0, result_counter, start_time))
+    # #print("Adding callback....")
     return result_counter.get_response_time()
 
 
-def main(_):
-    if not FLAGS.server:
-        print('please specify server host:port')
-        return
-    vocab_path = os.path.join(FLAGS.checkpoint_dir, "..", "vocab")
-    vocab_processor = learn.preprocessing.VocabularyProcessor.restore(vocab_path)
-
-    start = dt.now()
-    do_inference(FLAGS.server, FLAGS.work_dir,
-                              FLAGS.concurrency, FLAGS.num_tests, vocab_processor)
-    #print('\nInference error rate: %s%%' % (error_rate * 100))
-    end = dt.now()
-    print("Time taken: ", (end-start).seconds)
-
-if __name__ == '__main__':
-    tf.app.run()
+# def main(_):
+#     if not FLAGS.server:
+#         print('please specify server host:port')
+#         return
+#
+#
+#     start = dt.now()
+#     do_inference(FLAGS.server, FLAGS.concurrency, vocab_processor)
+#     #print('\nInference error rate: %s%%' % (error_rate * 100))
+#     end = dt.now()
+#     print("Time taken: ", (end-start).seconds)
