@@ -139,7 +139,7 @@ def _create_rpc_callback(label, result_counter, start_time):
             sys.stdout.write('.')
             sys.stdout.flush()
             response = numpy.array(
-                result_future.result().outputs['scores'].int64_val)
+                result_future.outputs['scores'].int64_val)
             #prediction = numpy.argmax(response)
             #print("Prediction: ", response)
             # if label != prediction:
